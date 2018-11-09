@@ -4,6 +4,8 @@ setwd("C:/Users/Derek/Google Drive/bootcamp/Project3")
 ### load dependencies
 library(readr)
 library(tidyverse)
+library(psych)
+library(h2o)
 
 ### load raw data
 train = read_csv("rawData/train.csv")
@@ -37,6 +39,16 @@ train.debatable = train[,c("Id", debatable, "SalePrice")]
 
 sum(length(numerical), length(categorical), length(debatable))
 
+# convert factor
+newDF = sapply(train.categorical, function(x) x = as.factor(x))
+newDF = as.data.frame(newDF)
+
+# describe
+describe(train[,numerical])$skew
+
+# convert types
+train$Alley[is.na(train$Alley)] = "None"
+
 # histogram of sale price
 # hist(train$SalePrice)
 # 
@@ -56,3 +68,13 @@ sum(length(numerical), length(categorical), length(debatable))
 #     geom_boxplot()
 # 
 # train %>% select(Alley) %>% distinct() %>% pull()
+
+trainId = sample(1:nrow(train), 0.8*nrow(train), replace = FALSE)
+trainSub = train[trainId,]
+validSub = train[-trainId,]
+
+h2o.init(nthreads = -1)
+df = as.h2o(trainSub)
+df_test = as.h2o(validSub)
+gbm = h2o.gbm(x = names(df[which(names(df) != "SalePrice")]), y = "SalePrice", training_frame = df, ntrees = 100, max_depth = 10, seed = 1)
+h2o.performance(gbm, df_test)
