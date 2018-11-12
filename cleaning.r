@@ -5,7 +5,6 @@ setwd("C:/Users/Derek/Google Drive/bootcamp/Project3")
 library(readr)
 library(tidyverse)
 library(psych)
-library(h2o)
 
 ### load raw data
 train = read_csv("rawData/train.csv")
@@ -14,6 +13,8 @@ train = read_csv("rawData/train.csv")
 names(train)
 summary(train)
 
+# describe
+describe(train[,numerical])
 
 # separate numerical and categorical variables
 numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
@@ -43,38 +44,6 @@ sum(length(numerical), length(categorical), length(debatable))
 newDF = sapply(train.categorical, function(x) x = as.factor(x))
 newDF = as.data.frame(newDF)
 
-# describe
-describe(train[,numerical])$skew
-
 # convert types
 train$Alley[is.na(train$Alley)] = "None"
 
-# histogram of sale price
-# hist(train$SalePrice)
-# 
-# plot(x = train$LotArea, y = train$SalePrice)
-# plot(x = train$OverallQual, y = train$SalePrice)
-# plot(x = train$OverallCond, y = train$SalePrice)
-# plot(x = train$YearBuilt, y = train$SalePrice)
-# plot(x = train$`1stFlrSF`, y = train$SalePrice)
-# plot(x = train$`2ndFlrSF`, y = train$SalePrice)
-# plot(x = train$GrLivArea, y = train$SalePrice)
-# plot(x = train$FullBath, y = train$SalePrice)
-# plot(x = train$HalfBath, y = train$SalePrice)
-# plot(x = train$BedroomAbvGr, y = train$SalePrice)
-# plot(x = train$TotRmsAbvGrd, y = train$SalePrice)
-# 
-# ggplot(data = train, aes(x = as.factor(MSSubClass), y = SalePrice))+
-#     geom_boxplot()
-# 
-# train %>% select(Alley) %>% distinct() %>% pull()
-
-trainId = sample(1:nrow(train), 0.8*nrow(train), replace = FALSE)
-trainSub = train[trainId,]
-validSub = train[-trainId,]
-
-h2o.init(nthreads = -1)
-df = as.h2o(trainSub)
-df_test = as.h2o(validSub)
-gbm = h2o.gbm(x = names(df[which(names(df) != "SalePrice")]), y = "SalePrice", training_frame = df, ntrees = 100, max_depth = 10, seed = 1)
-h2o.performance(gbm, df_test)
