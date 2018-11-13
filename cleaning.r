@@ -13,9 +13,6 @@ train = read_csv("rawData/train.csv")
 names(train)
 summary(train)
 
-# describe
-describe(train[,numerical])
-
 # separate numerical and categorical variables
 numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
               "BsmtUnfSF", "TotalBsmtSF", "1stFlrSF", "2ndFlrSF", "LowQualFinSF",
@@ -34,16 +31,46 @@ categorical = c("MSSubClass","MSZoning", "Street", "Alley", "LotShape",
 debatable = c("YearBuilt", "YearRemodAdd","BsmtFullBath", "BsmtHalfBath", "FullBath", 
               "HalfBath", "BedroomAbvGr", "KitchenAbvGr", "TotRmsAbvGrd", "Fireplaces",
               "GarageYrBlt", "GarageCars", "MoSold", "YrSold")
-train.numerical = train[,c("Id", numerical, "SalePrice")]
-train.categorical = train[,c("Id", categorical, "SalePrice")]
-train.debatable = train[,c("Id", debatable, "SalePrice")]
+
+# separate types for easier cleaning
+train.numerical = train[,c("Id", numerical)]
+train.categorical = train[,c("Id", categorical)]
+train.debatable = train[,c("Id", debatable)]
 
 sum(length(numerical), length(categorical), length(debatable))
 
-# convert factor
-newDF = sapply(train.categorical, function(x) x = as.factor(x))
-newDF = as.data.frame(newDF)
+# describe
+describe(train[,numerical])
+
+# check for columns containing NAs
+colnames(train.categorical)[colSums(is.na(train.categorical)) > 0]
+colnames(train.numerical)[colSums(is.na(train.numerical)) > 0]
+colnames(train.debatable)[colSums(is.na(train.debatable)) > 0]
+
+# look at each column with NAs
+train.categorical %>% select(MasVnrType) %>% head(10)
+# needs discussion >>> MasVnrType, MasVnrType, LotFrontage, GarageYrBlt <<<
 
 # convert types
-train$Alley[is.na(train$Alley)] = "None"
+train.categorical$Alley[is.na(train.categorical$Alley)] = "None"
+train.categorical$BsmtQual[is.na(train.categorical$BsmtQual)] = "No Bsmt"
+train.categorical$BsmtCond[is.na(train.categorical$BsmtCond)] = "No Bsmt"
+train.categorical$BsmtExposure[is.na(train.categorical$BsmtExposure)] = "No Bsmt"
+train.categorical$BsmtFinType1[is.na(train.categorical$BsmtFinType1)] = "No Bsmt"
+train.categorical$BsmtFinType2[is.na(train.categorical$BsmtFinType2)] = "No Bsmt"
+train.categorical$FireplaceQu[is.na(train.categorical$FireplaceQu)] = "No FrPl"
+train.categorical$GarageType[is.na(train.categorical$GarageType)] = "No Grge"
+train.categorical$GarageFinish[is.na(train.categorical$GarageFinish)] = "No Grge"
+train.categorical$GarageQual[is.na(train.categorical$GarageQual)] = "No Grge"
+train.categorical$GarageCond[is.na(train.categorical$GarageCond)] = "No Grge"
+train.categorical$PoolQC[is.na(train.categorical$PoolQC)] = "No Pool"
+train.categorical$Fence[is.na(train.categorical$Fence)] = "No Fnce"
+train.categorical$MiscFeature[is.na(train.categorical$MiscFeature)] = "None"
+
+# convert factor
+train.categorical = sapply(train.categorical, function(x) x = as.factor(x))
+train.categorical = as.data.frame(train.categorical)
+train.categorical$Id = as.character(train.categorical$Id)
+
+
 
