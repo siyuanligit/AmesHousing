@@ -3,17 +3,16 @@ setwd("C:/Users/Derek/Google Drive/bootcamp/Project3")
 
 ### load dependencies
 library(readr)
-library(tidyverse)
+library(dplyr)
 library(psych)
-library(h2o)
 
 ### load raw data
 train = read_csv("rawData/train.csv")
+# test = read_csv("rawData/test.csv")
 
 # check summary statistics
 names(train)
 summary(train)
-
 
 # separate numerical and categorical variables
 numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
@@ -33,48 +32,44 @@ categorical = c("MSSubClass","MSZoning", "Street", "Alley", "LotShape",
 debatable = c("YearBuilt", "YearRemodAdd","BsmtFullBath", "BsmtHalfBath", "FullBath", 
               "HalfBath", "BedroomAbvGr", "KitchenAbvGr", "TotRmsAbvGrd", "Fireplaces",
               "GarageYrBlt", "GarageCars", "MoSold", "YrSold")
-train.numerical = train[,c("Id", numerical, "SalePrice")]
-train.categorical = train[,c("Id", categorical, "SalePrice")]
-train.debatable = train[,c("Id", debatable, "SalePrice")]
 
-sum(length(numerical), length(categorical), length(debatable))
+# separate types for easier cleaning
+train.numerical = train[,c("Id", numerical)]
+train.categorical = train[,c("Id", categorical)]
+train.debatable = train[,c("Id", debatable)]
 
-# convert factor
-newDF = sapply(train.categorical, function(x) x = as.factor(x))
-newDF = as.data.frame(newDF)
-
-# describe
-describe(train[,numerical])$skew
+# needs discussion >>> MasVnrArea, MasVnrType, LotFrontage<<<
+train.numerical %>% select(MasVnrArea) %>% is.na() %>% table()
+train.categorical %>% select(MasVnrType) %>% is.na() %>% table()
 
 # convert types
-train$Alley[is.na(train$Alley)] = "None"
+train = train %>% 
+    mutate(# numerical 
+        
+        # categorical
+        Alley = ifelse(is.na(Alley), "None", Alley),
+        BsmtQual = ifelse(is.na(BsmtQual), "No Bsmt", BsmtQual),
+        BsmtCond = ifelse(is.na(BsmtCond), "No Bsmt", BsmtCond),
+        BsmtExposure = ifelse(is.na(BsmtExposure), "No Bsmt", BsmtExposure),
+        BsmtFinType1 = ifelse(is.na(BsmtFinType1), "No Bsmt", BsmtFinType1),
+        BsmtFinType2 = ifelse(is.na(BsmtFinType2), "No Bsmt", BsmtFinType2),
+        FireplaceQu = ifelse(is.na(FireplaceQu), "No FrPl", FireplaceQu),
+        GarageType = ifelse(is.na(GarageType), "No Grge", GarageType),
+        GarageFinish = ifelse(is.na(GarageFinish), "No Grge", GarageFinish),
+        GarageQual = ifelse(is.na(GarageQual), "No Grge", GarageQual),
+        GarageCond = ifelse(is.na(GarageCond), "No Grge", GarageCond),
+        PoolQC = ifelse(is.na(PoolQC), "No Pool", PoolQC),
+        Fence = ifelse(is.na(Fence), "No Fnce", Fence),
+        MiscFeature = ifelse(is.na(MiscFeature), "None", MiscFeature),
+        # misc type
+        GarageYrBlt = ifelse(is.na(GarageYrBlt), YearBuilt, GarageYrBlt),
+        Age = YrSold - YearRemodAdd
+    )
 
-# histogram of sale price
-# hist(train$SalePrice)
-# 
-# plot(x = train$LotArea, y = train$SalePrice)
-# plot(x = train$OverallQual, y = train$SalePrice)
-# plot(x = train$OverallCond, y = train$SalePrice)
-# plot(x = train$YearBuilt, y = train$SalePrice)
-# plot(x = train$`1stFlrSF`, y = train$SalePrice)
-# plot(x = train$`2ndFlrSF`, y = train$SalePrice)
-# plot(x = train$GrLivArea, y = train$SalePrice)
-# plot(x = train$FullBath, y = train$SalePrice)
-# plot(x = train$HalfBath, y = train$SalePrice)
-# plot(x = train$BedroomAbvGr, y = train$SalePrice)
-# plot(x = train$TotRmsAbvGrd, y = train$SalePrice)
-# 
-# ggplot(data = train, aes(x = as.factor(MSSubClass), y = SalePrice))+
-#     geom_boxplot()
-# 
-# train %>% select(Alley) %>% distinct() %>% pull()
+# convert factor
+train.categorical = sapply(train.categorical, function(x) x = as.factor(x))
+train.categorical = as.data.frame(train.categorical)
+train.categorical$Id = as.character(train.categorical$Id)
 
-trainId = sample(1:nrow(train), 0.8*nrow(train), replace = FALSE)
-trainSub = train[trainId,]
-validSub = train[-trainId,]
 
-h2o.init(nthreads = -1)
-df = as.h2o(trainSub)
-df_test = as.h2o(validSub)
-gbm = h2o.gbm(x = names(df[which(names(df) != "SalePrice")]), y = "SalePrice", training_frame = df, ntrees = 100, max_depth = 10, seed = 1)
-h2o.performance(gbm, df_test)
+train %>% select(YearRemodAdd) %>% table()
