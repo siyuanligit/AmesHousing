@@ -3,11 +3,14 @@ setwd("C:/Users/Derek/Google Drive/bootcamp/Project3")
 
 ### load dependencies
 library(readr)
+library(dplyr)
 library(tidyverse)
 library(psych)
+library(h2o)
 
 ### load raw data
-train = read_csv("rawData/train.csv")
+train = read_csv("../train.csv")
+test = read_csv("../test.csv")
 
 # check summary statistics
 names(train)
