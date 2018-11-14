@@ -5,6 +5,7 @@ library(tidyverse)
 library(psych)
 library(h2o)
 library(knitr)
+library(zoo)
 
 ### load raw data
 train = read_csv("../train.csv")
@@ -98,3 +99,14 @@ table(train$Utilities)
 kable(train[is.na(train$Utilities) | train$Utilities=='NoSeWa', 1:9])
 
 # Time Series
+
+train$DateSold <- as.yearmon(paste(train$YrSold, train$MoSold), "%Y %m")
+
+sapply(train, class)
+
+# Lot Frontage - Mean for NA
+for (i in 1:nrow(train)){
+  if(is.na(train$LotFrontage[i])){
+    train$LotFrontage[i] <- as.integer(mean(train$LotFrontage[train$Neighborhood==train$Neighborhood[i]], na.rm=TRUE)) 
+  }
+}
