@@ -4,47 +4,25 @@ library(dplyr)
 library(tidyr)
 library(Hmisc)
 library(zoo)
-
+library(VIM)
 
 ### load raw data
 df = read_csv("rawData/train.csv")
 # test = read_csv("rawData/test.csv")
 
 # check summary statistics
-# names(df)
-# summary(df)
+names(df)
+summary(df)
 
-# separate numerical and categorical variables
-# numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
-#               "BsmtUnfSF", "TotalBsmtSF", "1stFlrSF", "2ndFlrSF", "LowQualFinSF",
-#               "GrLivArea", "GarageArea", "WoodDeckSF", "OpenPorchSF", "EnclosedPorch",
-#               "3SsnPorch", "ScreenPorch", "PoolArea", "MiscVal")
-# categorical = c("MSSubClass","MSZoning", "Street", "Alley", "LotShape",
-#                 "LandContour", "Utilities", "LotConfig", "LandSlope", "Neighborhood",
-#                 "Condition1", "Condition2", "BldgType", "HouseStyle", "OverallQual",
-#                 "OverallCond", "RoofStyle", "RoofMatl", "Exterior1st", "Exterior2nd",
-#                 "MasVnrType", "ExterQual", "ExterCond", "Foundation", "BsmtQual",
-#                 "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2", "Heating",
-#                 "HeatingQC", "CentralAir", "Electrical", "KitchenQual", "Functional",
-#                 "FireplaceQu", "GarageType", "GarageFinish", "GarageQual", "GarageCond",
-#                 "PavedDrive", "PoolQC", "Fence", "MiscFeature", "SaleType", "SaleCondition")
-# debatable = c("YearBuilt", "YearRemodAdd","BsmtFullBath", "BsmtHalfBath", "FullBath",
-#               "HalfBath", "BedroomAbvGr", "KitchenAbvGr", "TotRmsAbvGrd", "Fireplaces",
-#               "GarageYrBlt", "GarageCars", "MoSold", "YrSold")
-
-# separate types for easier cleaning
-# df.numerical = df[,c("Id", numerical)]
-# df.categorical = df[,c("Id", categorical)]
-# df.debatable = df[,c("Id", debatable)]
-
-# needs discussion >>> MasVnrArea, MasVnrType, LotFrontage<<<
-# df.numerical %>% select(MasVnrArea) %>% is.na() %>% table()
-# df.categorical %>% select(MasVnrType) %>% is.na() %>% table()
+##Check Missing Data
+aggr(df, plot = F)
 
 # convert types
 df = df %>% 
     mutate(
-        Alley = ifelse(is.na(Alley), "None", Alley),
+        Alley = ifelse(is.na(Alley), "No Alley", Alley),
+        MasVnrArea = ifelse(is.na(MasVnrArea), 0, MasVnrArea),
+        MasVnrType = ifelse(MasVnrArea == 0, "No Vnr", MasVnrType),
         BsmtQual = ifelse(is.na(BsmtQual), "No Bsmt", BsmtQual),
         BsmtCond = ifelse(is.na(BsmtCond), "No Bsmt", BsmtCond),
         BsmtExposure = ifelse(is.na(BsmtExposure), "No Bsmt", BsmtExposure),
@@ -57,36 +35,43 @@ df = df %>%
         GarageCond = ifelse(is.na(GarageCond), "No Grge", GarageCond),
         PoolQC = ifelse(is.na(PoolQC), "No Pool", PoolQC),
         Fence = ifelse(is.na(Fence), "No Fnce", Fence),
-        MiscFeature = ifelse(is.na(MiscFeature), "None", MiscFeature),
+        MiscFeature = ifelse(is.na(MiscFeature), "No Feature", MiscFeature),
         GarageYrBlt = ifelse(is.na(GarageYrBlt), YearBuilt, GarageYrBlt),
         Age = YrSold - YearRemodAdd,
-        Remodeled = ifelse(YearBuilt == YearRemodAdd, 0, 1),
-        Bsmt = ifelse(BsmtQual == "No Bsmt", 0, 1),
-        Garage = ifelse(GarageType == "No Grge", 0, 1),
+        Remodeled = ifelse(YearBuilt == YearRemodAdd, "No", "Yes"),
+        Bsmt = ifelse(BsmtQual == "No Bsmt", "No", "Yes"),
+        Garage = ifelse(GarageType == "No Grge", "No", "Yes"),
+        Pool = ifelse(PoolQC == "No Pool", "No", "Yes"),
         TotalBath = BsmtFullBath + 0.5*BsmtHalfBath + FullBath + 0.5*HalfBath,
-        Condition.Norm = ifelse(Condition1 == "Norm" | Condition1 == "Norm", 1, 0),
-        Condition.Artery = ifelse(Condition1 == "Artery" | Condition1 == "Artery", 1, 0),
-        Condition.Feedr = ifelse(Condition1 == "Feedr" | Condition1 == "Feedr", 1, 0),
-        Condition.PosA = ifelse(Condition1 == "PosA" | Condition1 == "PosA", 1, 0),
-        Condition.PosN = ifelse(Condition1 == "PosN" | Condition1 == "PosN", 1, 0),
-        Condition.RRAe = ifelse(Condition1 == "RRAe" | Condition1 == "RRAe", 1, 0),
-        Condition.RRAn = ifelse(Condition1 == "RRAn" | Condition1 == "RRAn", 1, 0),
-        Condition.RRNe = ifelse(Condition1 == "RRNe" | Condition1 == "RRNe", 1, 0),
-        Condition.RRNn = ifelse(Condition1 == "RRNn" | Condition1 == "RRNn", 1, 0),
+        Condition.Norm = ifelse(Condition1 == "Norm" | Condition1 == "Norm", "Yes", "No"),
+        Condition.Artery = ifelse(Condition1 == "Artery" | Condition1 == "Artery", "Yes", "No"),
+        Condition.Feedr = ifelse(Condition1 == "Feedr" | Condition1 == "Feedr", "Yes", "No"),
+        Condition.PosA = ifelse(Condition1 == "PosA" | Condition1 == "PosA", "Yes", "No"),
+        Condition.PosN = ifelse(Condition1 == "PosN" | Condition1 == "PosN", "Yes", "No"),
+        Condition.RRAe = ifelse(Condition1 == "RRAe" | Condition1 == "RRAe", "Yes", "No"),
+        Condition.RRAn = ifelse(Condition1 == "RRAn" | Condition1 == "RRAn", "Yes", "No"),
+        Condition.RRNe = ifelse(Condition1 == "RRNe" | Condition1 == "RRNe", "Yes", "No"),
+        Condition.RRNn = ifelse(Condition1 == "RRNn" | Condition1 == "RRNn", "Yes", "No"),
         TotSF = GrLivArea + TotalBsmtSF,
-        Basement = ifelse(TotalBsmtSF == 0, 0, 1),
-        DateSold = as.yearmon(paste(df$YrSold, df$MoSold), "%Y %m")) %>% 
-    select(-Id, -Utilities, -Condition1, -Condition2)
+        DateSold = as.yearmon(paste(df$YrSold, df$MoSold), "%Y %m"),
+        PorchTotSF = WoodDeckSF + OpenPorchSF + EnclosedPorch + `3SsnPorch` + ScreenPorch,
+        WoodDeck = ifelse(WoodDeckSF == 0, "No", "Yes"),
+        OpenPorch = ifelse(OpenPorchSF == 0, "No", "Yes"),
+        EnclosePorch = ifelse(EnclosedPorch == 0, "No", "Yes"),
+        ThreePorch = ifelse(`3SsnPorch` == 0, "No", "Yes"),
+        SPorch = ifelse(ScreenPorch == 0, "No", "Yes"),
+        Electrical = replace_na(Electrical, "SBrkr")) %>% 
+    select(-Id, -Condition1, -Condition2)
 
+# imputation of LotFrontage
 df.neighborhoodFrontage = df %>% 
     group_by(Neighborhood) %>% 
-    summarise(meanLotf = mean(LotFrontage, na.rm = TRUE))
+    summarise(MeanLotf = mean(LotFrontage, na.rm = TRUE))
 df = df %>% left_join(df.neighborhoodFrontage, by = "Neighborhood") %>% 
-    mutate(LotFrontage = ifelse(is.na(LotFrontage), meanLotf, LotFrontage)) %>% 
-    select(-meanLotf)
+    mutate(LotFrontage = ifelse(is.na(LotFrontage), MeanLotf, LotFrontage)) %>% 
+    select(-MeanLotf)
 
-# convert factor
-# >>> not working, but probably dont need since ML packages automatically treat character as factor <<<
-# df = sapply(categorical, function(x) df[,x] = as.factor(df[,x])) 
-# df = as.data.frame(df)
-# df.categorical$Id = as.character(df.categorical$Id)
+# make MSSubClass character
+df$MSSubClass = as.factor(df$MSSubClass)
+
+save(df, file = "cleanDF.rdata")
