@@ -1,6 +1,3 @@
-### set working directory
-setwd("C:/Users/Derek/Google Drive/bootcamp/Project3")
-
 ### load dependencies
 library(readr)
 library(tidyverse)
