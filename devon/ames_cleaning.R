@@ -129,6 +129,13 @@ Garage[!complete.cases(Garage),]
 bigdat[2577,] = bigdat[2577,] %>%
   mutate(.,GarageType = "None",GarageCars = 0, GarageArea = 0)
 aggr(bigdat,plot = F)
+
+bigdat$Age = bigdat$YrSold - bigdat$YearRemodAdd
+bigdat$TotBath = bigdat$FullBath + bigdat$BsmtFullBath +  (bigdat$HalfBath*.5) + (bigdat$BsmtHalfBath*.5)
+bigdat$GarageYN = ifelse(bigdat$YearBuilt == bigdat$GarageYrBlt,"No","Yes")
+bigdat$RemodYN = ifelse(bigdat$YearBuilt == bigdat$YearRemodAdd,"No","Yes")
+bigdat$BsmtYN = ifelse(bigdat$TotalBsmtSF == 0,"No","Yes")
+bigdat$PoolYN = ifelse(bigdat$PoolArea == 0,"No","Yes")
 ###IGNORE THE BOTTOM, MY OWN MUSINGS!!!
 # mice(bigdat)
 # sqrt(2919)
