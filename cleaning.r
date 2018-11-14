@@ -1,11 +1,9 @@
-### set working directory
-setwd("C:/Users/Derek/Google Drive/bootcamp/Project3")
-
 ### load dependencies
 library(readr)
 library(dplyr)
 library(tidyr)
 library(Hmisc)
+
 
 ### load raw data
 df = read_csv("rawData/train.csv")
