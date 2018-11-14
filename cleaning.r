@@ -73,5 +73,7 @@ df = df %>% left_join(df.neighborhoodFrontage, by = "Neighborhood") %>%
 
 # make MSSubClass character
 df$MSSubClass = as.factor(df$MSSubClass)
+df$OverallQual = as.factor(df$OverallQual)
+df$OverallCond = as.factor(df$OverallCond)
 
 save(df, file = "cleanDF.rdata")
