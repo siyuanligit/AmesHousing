@@ -4,6 +4,7 @@ setwd("C:/Users/Derek/Google Drive/bootcamp/Project3")
 ### load dependencies
 library(readr)
 library(dplyr)
+library(tidyr)
 library(psych)
 
 ### load raw data
@@ -15,22 +16,22 @@ names(train)
 summary(train)
 
 # separate numerical and categorical variables
-numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
-              "BsmtUnfSF", "TotalBsmtSF", "1stFlrSF", "2ndFlrSF", "LowQualFinSF",
-              "GrLivArea", "GarageArea", "WoodDeckSF", "OpenPorchSF", "EnclosedPorch",
-              "3SsnPorch", "ScreenPorch", "PoolArea", "MiscVal")
-categorical = c("MSSubClass","MSZoning", "Street", "Alley", "LotShape",
-                "LandContour", "Utilities", "LotConfig", "LandSlope", "Neighborhood",
-                "Condition1", "Condition2", "BldgType", "HouseStyle", "OverallQual",
-                "OverallCond", "RoofStyle", "RoofMatl", "Exterior1st", "Exterior2nd",
-                "MasVnrType", "ExterQual", "ExterCond", "Foundation", "BsmtQual",
-                "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2", "Heating",
-                "HeatingQC", "CentralAir", "Electrical", "KitchenQual", "Functional",
-                "FireplaceQu", "GarageType", "GarageFinish", "GarageQual", "GarageCond",
-                "PavedDrive", "PoolQC", "Fence", "MiscFeature", "SaleType", "SaleCondition")
-debatable = c("YearBuilt", "YearRemodAdd","BsmtFullBath", "BsmtHalfBath", "FullBath",
-              "HalfBath", "BedroomAbvGr", "KitchenAbvGr", "TotRmsAbvGrd", "Fireplaces",
-              "GarageYrBlt", "GarageCars", "MoSold", "YrSold")
+# numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
+#               "BsmtUnfSF", "TotalBsmtSF", "1stFlrSF", "2ndFlrSF", "LowQualFinSF",
+#               "GrLivArea", "GarageArea", "WoodDeckSF", "OpenPorchSF", "EnclosedPorch",
+#               "3SsnPorch", "ScreenPorch", "PoolArea", "MiscVal")
+# categorical = c("MSSubClass","MSZoning", "Street", "Alley", "LotShape",
+#                 "LandContour", "Utilities", "LotConfig", "LandSlope", "Neighborhood",
+#                 "Condition1", "Condition2", "BldgType", "HouseStyle", "OverallQual",
+#                 "OverallCond", "RoofStyle", "RoofMatl", "Exterior1st", "Exterior2nd",
+#                 "MasVnrType", "ExterQual", "ExterCond", "Foundation", "BsmtQual",
+#                 "BsmtCond", "BsmtExposure", "BsmtFinType1", "BsmtFinType2", "Heating",
+#                 "HeatingQC", "CentralAir", "Electrical", "KitchenQual", "Functional",
+#                 "FireplaceQu", "GarageType", "GarageFinish", "GarageQual", "GarageCond",
+#                 "PavedDrive", "PoolQC", "Fence", "MiscFeature", "SaleType", "SaleCondition")
+# debatable = c("YearBuilt", "YearRemodAdd","BsmtFullBath", "BsmtHalfBath", "FullBath",
+#               "HalfBath", "BedroomAbvGr", "KitchenAbvGr", "TotRmsAbvGrd", "Fireplaces",
+#               "GarageYrBlt", "GarageCars", "MoSold", "YrSold")
 
 # separate types for easier cleaning
 # train.numerical = train[,c("Id", numerical)]
@@ -43,9 +44,7 @@ debatable = c("YearBuilt", "YearRemodAdd","BsmtFullBath", "BsmtHalfBath", "FullB
 
 # convert types
 train = train %>% 
-    mutate(# numerical 
-        
-        # categorical
+    mutate(
         Alley = ifelse(is.na(Alley), "None", Alley),
         BsmtQual = ifelse(is.na(BsmtQual), "No Bsmt", BsmtQual),
         BsmtCond = ifelse(is.na(BsmtCond), "No Bsmt", BsmtCond),
@@ -60,9 +59,23 @@ train = train %>%
         PoolQC = ifelse(is.na(PoolQC), "No Pool", PoolQC),
         Fence = ifelse(is.na(Fence), "No Fnce", Fence),
         MiscFeature = ifelse(is.na(MiscFeature), "None", MiscFeature),
-        # misc type
         GarageYrBlt = ifelse(is.na(GarageYrBlt), YearBuilt, GarageYrBlt),
-        Age = YrSold - YearRemodAdd)
+        Age = YrSold - YearRemodAdd,
+        Remodeled = ifelse(YearBuilt == YearRemodAdd, 0, 1),
+        Bsmt = ifelse(BsmtQual == "No Bsmt", 0, 1),
+        Garage = ifelse(GarageType == "No Grge", 0, 1)) %>% 
+    select(-Id)
+
+train.neighborhoodFrontage = train %>% 
+    group_by(Neighborhood) %>% 
+    summarise(medianLotf = median(LotFrontage, na.rm = TRUE),
+              meanLotf = mean(LotFrontage, na.rm = TRUE))
+train %>% left_join(train.neighborhoodFrontage, by = "Neighborhood") %>% 
+    mutate(LotFrontage = ifelse(is.na(LotFrontage), meanLotf, LotFrontage)) %>%
+    select(LotFrontage) %>% 
+    pull() %>% 
+    hist()
+
 
 # convert factor
 # >>> not working, but probably dont need since ML packages automatically treat character as factor <<<
