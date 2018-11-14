@@ -3,6 +3,7 @@ library(readr)
 library(dplyr)
 library(tidyr)
 library(Hmisc)
+library(zoo)
 
 
 ### load raw data
@@ -10,8 +11,8 @@ df = read_csv("rawData/train.csv")
 # test = read_csv("rawData/test.csv")
 
 # check summary statistics
-names(df)
-summary(df)
+# names(df)
+# summary(df)
 
 # separate numerical and categorical variables
 # numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
@@ -71,14 +72,18 @@ df = df %>%
         Condition.RRAe = ifelse(Condition1 == "RRAe" | Condition1 == "RRAe", 1, 0),
         Condition.RRAn = ifelse(Condition1 == "RRAn" | Condition1 == "RRAn", 1, 0),
         Condition.RRNe = ifelse(Condition1 == "RRNe" | Condition1 == "RRNe", 1, 0),
-        Condition.RRNn = ifelse(Condition1 == "RRNn" | Condition1 == "RRNn", 1, 0)) %>% 
+        Condition.RRNn = ifelse(Condition1 == "RRNn" | Condition1 == "RRNn", 1, 0),
+        TotSF = GrLivArea + TotalBsmtSF,
+        Basement = ifelse(TotalBsmtSF == 0, 0, 1),
+        DateSold = as.yearmon(paste(df$YrSold, df$MoSold), "%Y %m")) %>% 
     select(-Id, -Utilities, -Condition1, -Condition2)
 
 df.neighborhoodFrontage = df %>% 
     group_by(Neighborhood) %>% 
     summarise(meanLotf = mean(LotFrontage, na.rm = TRUE))
 df = df %>% left_join(df.neighborhoodFrontage, by = "Neighborhood") %>% 
-    mutate(LotFrontage = ifelse(is.na(LotFrontage), meanLotf, LotFrontage))
+    mutate(LotFrontage = ifelse(is.na(LotFrontage), meanLotf, LotFrontage)) %>% 
+    select(-meanLotf)
 
 # convert factor
 # >>> not working, but probably dont need since ML packages automatically treat character as factor <<<
