@@ -5,15 +5,15 @@ setwd("C:/Users/Derek/Google Drive/bootcamp/Project3")
 library(readr)
 library(dplyr)
 library(tidyr)
-library(psych)
+library(Hmisc)
 
 ### load raw data
-train = read_csv("rawData/train.csv")
+df = read_csv("rawData/train.csv")
 # test = read_csv("rawData/test.csv")
 
 # check summary statistics
-names(train)
-summary(train)
+names(df)
+summary(df)
 
 # separate numerical and categorical variables
 # numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
@@ -34,16 +34,16 @@ summary(train)
 #               "GarageYrBlt", "GarageCars", "MoSold", "YrSold")
 
 # separate types for easier cleaning
-# train.numerical = train[,c("Id", numerical)]
-# train.categorical = train[,c("Id", categorical)]
-# train.debatable = train[,c("Id", debatable)]
+# df.numerical = df[,c("Id", numerical)]
+# df.categorical = df[,c("Id", categorical)]
+# df.debatable = df[,c("Id", debatable)]
 
 # needs discussion >>> MasVnrArea, MasVnrType, LotFrontage<<<
-# train.numerical %>% select(MasVnrArea) %>% is.na() %>% table()
-# train.categorical %>% select(MasVnrType) %>% is.na() %>% table()
+# df.numerical %>% select(MasVnrArea) %>% is.na() %>% table()
+# df.categorical %>% select(MasVnrType) %>% is.na() %>% table()
 
 # convert types
-train = train %>% 
+df = df %>% 
     mutate(
         Alley = ifelse(is.na(Alley), "None", Alley),
         BsmtQual = ifelse(is.na(BsmtQual), "No Bsmt", BsmtQual),
@@ -63,22 +63,27 @@ train = train %>%
         Age = YrSold - YearRemodAdd,
         Remodeled = ifelse(YearBuilt == YearRemodAdd, 0, 1),
         Bsmt = ifelse(BsmtQual == "No Bsmt", 0, 1),
-        Garage = ifelse(GarageType == "No Grge", 0, 1)) %>% 
-    select(-Id)
+        Garage = ifelse(GarageType == "No Grge", 0, 1),
+        TotalBath = BsmtFullBath + 0.5*BsmtHalfBath + FullBath + 0.5*HalfBath,
+        Condition.Norm = ifelse(Condition1 == "Norm" | Condition1 == "Norm", 1, 0),
+        Condition.Artery = ifelse(Condition1 == "Artery" | Condition1 == "Artery", 1, 0),
+        Condition.Feedr = ifelse(Condition1 == "Feedr" | Condition1 == "Feedr", 1, 0),
+        Condition.PosA = ifelse(Condition1 == "PosA" | Condition1 == "PosA", 1, 0),
+        Condition.PosN = ifelse(Condition1 == "PosN" | Condition1 == "PosN", 1, 0),
+        Condition.RRAe = ifelse(Condition1 == "RRAe" | Condition1 == "RRAe", 1, 0),
+        Condition.RRAn = ifelse(Condition1 == "RRAn" | Condition1 == "RRAn", 1, 0),
+        Condition.RRNe = ifelse(Condition1 == "RRNe" | Condition1 == "RRNe", 1, 0),
+        Condition.RRNn = ifelse(Condition1 == "RRNn" | Condition1 == "RRNn", 1, 0)) %>% 
+    select(-Id, -Utilities, -Condition1, -Condition2)
 
-train.neighborhoodFrontage = train %>% 
+df.neighborhoodFrontage = df %>% 
     group_by(Neighborhood) %>% 
-    summarise(medianLotf = median(LotFrontage, na.rm = TRUE),
-              meanLotf = mean(LotFrontage, na.rm = TRUE))
-train %>% left_join(train.neighborhoodFrontage, by = "Neighborhood") %>% 
-    mutate(LotFrontage = ifelse(is.na(LotFrontage), meanLotf, LotFrontage)) %>%
-    select(LotFrontage) %>% 
-    pull() %>% 
-    hist()
-
+    summarise(meanLotf = mean(LotFrontage, na.rm = TRUE))
+df = df %>% left_join(df.neighborhoodFrontage, by = "Neighborhood") %>% 
+    mutate(LotFrontage = ifelse(is.na(LotFrontage), meanLotf, LotFrontage))
 
 # convert factor
 # >>> not working, but probably dont need since ML packages automatically treat character as factor <<<
-# train = sapply(categorical, function(x) train[,x] = as.factor(train[,x])) 
-# train = as.data.frame(train)
-# train.categorical$Id = as.character(train.categorical$Id)
+# df = sapply(categorical, function(x) df[,x] = as.factor(df[,x])) 
+# df = as.data.frame(df)
+# df.categorical$Id = as.character(df.categorical$Id)
