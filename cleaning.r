@@ -4,6 +4,7 @@ library(dplyr)
 library(tidyverse)
 library(psych)
 library(h2o)
+library(knitr)
 
 ### load raw data
 train = read_csv("../train.csv")
@@ -91,3 +92,9 @@ train %>%
          TotalBsmtSF = as.integer(TotalBsmtSF),
          TotSF = GrLivArea + TotalBsmtSF,
          Basement = ifelse(TotalBsmtSF == 0, 0, 1))
+
+# Utilities
+table(train$Utilities)
+kable(train[is.na(train$Utilities) | train$Utilities=='NoSeWa', 1:9])
+
+# Time Series
