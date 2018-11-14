@@ -17,9 +17,9 @@ summary(train)
 # separate numerical and categorical variables
 numerical = c("LotFrontage", "LotArea", "MasVnrArea", "BsmtFinSF1", "BsmtFinSF2",
               "BsmtUnfSF", "TotalBsmtSF", "1stFlrSF", "2ndFlrSF", "LowQualFinSF",
-              "GrLivArea", "GarageArea", "WoodDeckSF", "OpenPorchSF", "EnclosedPorch", 
+              "GrLivArea", "GarageArea", "WoodDeckSF", "OpenPorchSF", "EnclosedPorch",
               "3SsnPorch", "ScreenPorch", "PoolArea", "MiscVal")
-categorical = c("MSSubClass","MSZoning", "Street", "Alley", "LotShape", 
+categorical = c("MSSubClass","MSZoning", "Street", "Alley", "LotShape",
                 "LandContour", "Utilities", "LotConfig", "LandSlope", "Neighborhood",
                 "Condition1", "Condition2", "BldgType", "HouseStyle", "OverallQual",
                 "OverallCond", "RoofStyle", "RoofMatl", "Exterior1st", "Exterior2nd",
@@ -28,19 +28,18 @@ categorical = c("MSSubClass","MSZoning", "Street", "Alley", "LotShape",
                 "HeatingQC", "CentralAir", "Electrical", "KitchenQual", "Functional",
                 "FireplaceQu", "GarageType", "GarageFinish", "GarageQual", "GarageCond",
                 "PavedDrive", "PoolQC", "Fence", "MiscFeature", "SaleType", "SaleCondition")
-# >>> variables that need to be discussed <<<
-debatable = c("YearBuilt", "YearRemodAdd","BsmtFullBath", "BsmtHalfBath", "FullBath", 
+debatable = c("YearBuilt", "YearRemodAdd","BsmtFullBath", "BsmtHalfBath", "FullBath",
               "HalfBath", "BedroomAbvGr", "KitchenAbvGr", "TotRmsAbvGrd", "Fireplaces",
               "GarageYrBlt", "GarageCars", "MoSold", "YrSold")
 
 # separate types for easier cleaning
-train.numerical = train[,c("Id", numerical)]
-train.categorical = train[,c("Id", categorical)]
-train.debatable = train[,c("Id", debatable)]
+# train.numerical = train[,c("Id", numerical)]
+# train.categorical = train[,c("Id", categorical)]
+# train.debatable = train[,c("Id", debatable)]
 
 # needs discussion >>> MasVnrArea, MasVnrType, LotFrontage<<<
-train.numerical %>% select(MasVnrArea) %>% is.na() %>% table()
-train.categorical %>% select(MasVnrType) %>% is.na() %>% table()
+# train.numerical %>% select(MasVnrArea) %>% is.na() %>% table()
+# train.categorical %>% select(MasVnrType) %>% is.na() %>% table()
 
 # convert types
 train = train %>% 
@@ -63,13 +62,10 @@ train = train %>%
         MiscFeature = ifelse(is.na(MiscFeature), "None", MiscFeature),
         # misc type
         GarageYrBlt = ifelse(is.na(GarageYrBlt), YearBuilt, GarageYrBlt),
-        Age = YrSold - YearRemodAdd
-    )
+        Age = YrSold - YearRemodAdd)
 
 # convert factor
-train.categorical = sapply(train.categorical, function(x) x = as.factor(x))
-train.categorical = as.data.frame(train.categorical)
-train.categorical$Id = as.character(train.categorical$Id)
-
-
-train %>% select(YearRemodAdd) %>% table()
+# >>> not working, but probably dont need since ML packages automatically treat character as factor <<<
+# train = sapply(categorical, function(x) train[,x] = as.factor(train[,x])) 
+# train = as.data.frame(train)
+# train.categorical$Id = as.character(train.categorical$Id)
