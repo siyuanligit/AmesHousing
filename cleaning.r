@@ -67,10 +67,27 @@ train.categorical$PoolQC[is.na(train.categorical$PoolQC)] = "No Pool"
 train.categorical$Fence[is.na(train.categorical$Fence)] = "No Fnce"
 train.categorical$MiscFeature[is.na(train.categorical$MiscFeature)] = "None"
 
+train$BsmtFullBath[is.na(train$BsmtFullBath)] = "0"
+train$BsmtHalfBath[is.na(train$BsmtHalfBath)] = "0"
+train$FullBath[is.na(train$FullBath)] = "0"
+train$HalfBath[is.na(train$HalfBath)] = "0"
+train$TotalBsmtSF[is.na(train$TotalBsmtSF)] = "0"
+
 # convert factor
 train.categorical = sapply(train.categorical, function(x) x = as.factor(x))
 train.categorical = as.data.frame(train.categorical)
 train.categorical$Id = as.character(train.categorical$Id)
 
-
-
+# Bathrooms and Total SF
+train %>%
+  mutate(BsmtHalfBath = as.double(BsmtHalfBath),
+         HalfBath = as.double(HalfBath),
+         BsmtFullBath = as.double(BsmtFullBath),
+         FullBath = as.double(FullBath), 
+         BsmtHalfBath = BsmtHalfBath * 0.5,
+         HalfBath = HalfBath * 0.5,
+         TotBath = FullBath + HalfBath + BsmtFullBath + BsmtHalfBath,
+         # SF
+         TotalBsmtSF = as.integer(TotalBsmtSF),
+         TotSF = GrLivArea + TotalBsmtSF,
+         Basement = ifelse(TotalBsmtSF == 0, 0, 1))
