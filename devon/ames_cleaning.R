@@ -5,6 +5,8 @@ library(car)
 library(mice)
 library(VIM)
 library(RANN)
+library(e1071)
+library(Hmisc)
 ##Read in the Data
 trn = read_csv("rawData/train.csv")
 test = read_csv("rawData/test.csv")
@@ -136,20 +138,14 @@ bigdat$GarageYN = ifelse(bigdat$YearBuilt == bigdat$GarageYrBlt,"No","Yes")
 bigdat$RemodYN = ifelse(bigdat$YearBuilt == bigdat$YearRemodAdd,"No","Yes")
 bigdat$BsmtYN = ifelse(bigdat$TotalBsmtSF == 0,"No","Yes")
 bigdat$PoolYN = ifelse(bigdat$PoolArea == 0,"No","Yes")
-###IGNORE THE BOTTOM, MY OWN MUSINGS!!!
-# mice(bigdat)
-# sqrt(2919)
-# pre.54nn = preProcess(bigdat, method = 'knnImpute', k=54)
-# imputed.54nn = kNN(bigdat,k = 54)
-# 
-# newcategorical = imputed.54nn[,sapply(imputed.54nn,is.factor)]
-# newnumerical = imputed.54nn[,sapply(imputed.54nn,is.numeric)]
-# descrpt = describe(newnumerical)
-# row2log=rownames(descrpt[abs(descrpt$skew)>=1,])
-# length(row2log)
-# for(i in 1:length(row2log)){
-#   newnumerical[,row2log[i]] = log((newnumerical[,row2log[i]] + 1))
-# }
-# descrpt2 = describe(newnumerical)
-# rnames = rownames(descrpt2)
-# skews = cbind(rnames,bees = descrpt$skew, boop = descrpt2$skew)
+
+trn = bigdat %>%
+  filter(.,Set == "train")
+
+test = bigdat %>%
+  filter(.,Set == "test")
+aggr(trn,plot = F)
+
+hist(trn$LotFrontage)
+table(trn$LotFrontage)
+aggr(test,plot = F)
