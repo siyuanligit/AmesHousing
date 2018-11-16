@@ -6,7 +6,7 @@ library(zoo)
 library(VIM)
 library(knitr)
 
-test = read_csv("test.csv")
+test = read_csv("rawData/test.csv")
 
 # check summary statistics
 names(test)
@@ -182,3 +182,5 @@ test$TotSF = test$GrLivArea + test$TotalBsmtSF
 
 ##Check Missing Data
 aggr(test, plot = F)
+
+save(test, file = "cleanTest.rdata")
