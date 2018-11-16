@@ -115,6 +115,7 @@ lm.plt <- function(data, mapping, ...){
 ggpairs(allnumVar, cor_High[1:6], lower = list(continuous = lm.plt))
 
 # SalePrice Count
+
 ggplot(df, aes(x = SalePrice)) +
   geom_histogram(fill = "deepskyblue4", binwidth = 10000) +
   scale_x_continuous(breaks = seq(0, 800000, by = 100000), labels = scales::comma)
@@ -136,6 +137,7 @@ ggplot(df, aes(x = reorder(Neighborhood, SalePrice), y = SalePrice, fill = Neigh
   geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
   
 # Overall Quality Boxplot
+
 ggplot(df, aes(x = OverallQual, y = SalePrice, fill = OverallQual)) +
   geom_boxplot(alpha = .75, size = .25) +
   geom_jitter(shape = 16, position = position_jitter(0.2), size = 1, alpha = .25) +
@@ -144,13 +146,22 @@ ggplot(df, aes(x = OverallQual, y = SalePrice, fill = OverallQual)) +
   geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
 
 # Total SF Scatterplot
+
 ggplot(df, aes(x = TotSF, y = SalePrice, color = TotSF)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
 
 # Above Ground Living Area Scatterplot
+
 ggplot(df, aes(x = GrLivArea, y = SalePrice, color = GrLivArea)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
+
+# Total Basement SF
+
+ggplot(df, aes(x = TotalBsmtSF, y = SalePrice, color = TotalBsmtSF)) + 
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
