@@ -83,9 +83,15 @@ system.time({
 h2o.performance(gbmF, train2o)
 h2o.performance(gbmF, test2o)
 
+for (col in names(df)){
+    if (class(df[,col]) == "Character"){
+        df[,col] = as.factor(df[,col])
+    }
+}
 
 
-
+library(gbm)
+gbmNative = gbm(SalePrice ~., data = df, n.trees = 100, interaction.depth = 5)
 
 
 
