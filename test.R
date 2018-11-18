@@ -182,3 +182,5 @@ test$TotSF = test$GrLivArea + test$TotalBsmtSF
 
 ##Check Missing Data
 aggr(test, plot = F)
+
+save(test, file = "testDF.rdata")

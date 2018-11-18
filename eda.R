@@ -9,6 +9,10 @@ library(VIM)
 library(corrplot)
 library(ggthemes)
 library(GGally)
+library(caret)
+library(xgboost)
+library(gdata)
+library(outliers)
 
 ### load raw data
 df = read_csv("train.csv")
@@ -83,7 +87,12 @@ df$OverallCond = as.factor(df$OverallCond)
 save(df, file = "cleanDF.rdata")
 
 # Check missing
-aggr(test, plot = F)
+aggr(df, plot = F)
+
+# Remove Outliers
+
+df2 <- df %>% 
+  filter(GrLivArea < 4000)
 
 # Correlations with SalePrice
 
@@ -92,11 +101,11 @@ numVarsNames <- names(numVars)
 
 allnumVar <- df[, numVars]
 corVar <- cor(allnumVar)
-cor_sort <- as.matrix(sort(cor_numVar[,'SalePrice'], decreasing = TRUE))
+cor_sort <- as.matrix(sort(corVar[,'SalePrice'], decreasing = TRUE))
 
 # with abs value > 0.5
-cor_High <- names(which(apply(cor_sorted, 1, function(x) abs(x)>0.5)))
-corVar <- cor_numVar[cor_High, cor_High]
+cor_High <- names(which(apply(cor_sort, 1, function(x) abs(x)>0.5)))
+corVar <- corVar[cor_High, cor_High]
 
 corrplot.mixed(corVar, tl.col="black", tl.pos = "lt", tl.cex = 0.7,cl.cex = .7, number.cex=.7)
 
@@ -114,6 +123,35 @@ lm.plt <- function(data, mapping, ...){
 
 ggpairs(allnumVar, cor_High[1:6], lower = list(continuous = lm.plt))
 
+# Correlation df2
+
+numVars2 <- which(sapply(df2, is.numeric))
+numVarsNames2 <- names(numVars2)
+
+allnumVar2 <- df2[, numVars2]
+corVar2 <- cor(allnumVar2)
+cor_sort2 <- as.matrix(sort(corVar2[,'SalePrice'], decreasing = TRUE))
+
+# with abs value > 0.5
+cor_High2 <- names(which(apply(cor_sort2, 1, function(x) abs(x)>0.5)))
+corVar2 <- corVar2[cor_High2, cor_High2]
+
+corrplot.mixed(corVar2, tl.col="black", tl.pos = "lt", tl.cex = 0.7,cl.cex = .7, number.cex=.7)
+
+corrplot(as.matrix(corVar2), type = 'upper', method = 'color', 
+         addCoef.col = 'black', tl.cex = .7, cl.cex = .7, number.cex = .7)
+
+require(GGally)
+lm.plt <- function(data, mapping, ...){
+  plt <- ggplot(data = data, mapping = mapping) +
+    geom_point(shape = 20, alpha = 0.7, color = 'deepskyblue4') +
+    geom_smooth(method=loess, fill="forestgreen", color="forestgreen") +
+    geom_smooth(method=lm, fill="red", color="red")
+  return(plt)
+}
+
+ggpairs(allnumVar2, cor_High2[1:6], lower = list(continuous = lm.plt))
+
 # SalePrice Count
 
 ggplot(df, aes(x = SalePrice)) +
@@ -121,11 +159,19 @@ ggplot(df, aes(x = SalePrice)) +
   scale_x_continuous(breaks = seq(0, 800000, by = 100000), labels = scales::comma)
 
 # Sale Price by Neighborhood Bar plot
+
 ggplot(df, aes(x = reorder(Neighborhood, -SalePrice), y = SalePrice, fill = Neighborhood)) +
   geom_bar(stat = 'summary', fun.y = 'median') +
   theme(legend.position = "none", axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) + 
   geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
+
+ggplot(df2, aes(x = reorder(Neighborhood, SalePrice), y = SalePrice, fill = Neighborhood)) +
+  geom_bar(stat = 'summary', fun.y = 'median') +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) + 
+  geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3) +
+  labs(x = "Neighborhood")
 
 # Sale Price by Neighborhood Boxplot
 
@@ -135,12 +181,25 @@ ggplot(df, aes(x = reorder(Neighborhood, SalePrice), y = SalePrice, fill = Neigh
   theme(legend.position = "none", axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) + 
   geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
+
+ggplot(df2, aes(x = reorder(Neighborhood, SalePrice), y = SalePrice, fill = Neighborhood)) +
+  geom_boxplot(alpha = .75, size = .25) + 
+  theme(legend.position = "none", axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) + 
+  geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3) +
+  labs(x = "Neighborhood")
   
 # Overall Quality Boxplot
 
 ggplot(df, aes(x = OverallQual, y = SalePrice, fill = OverallQual)) +
   geom_boxplot(alpha = .75, size = .25) +
   geom_jitter(shape = 16, position = position_jitter(0.2), size = 1, alpha = .25) +
+  theme(legend.position = "none") +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) + 
+  geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
+
+ggplot(df2, aes(x = OverallQual, y = SalePrice, fill = OverallQual)) +
+  geom_boxplot(alpha = .75, size = .25) +
   theme(legend.position = "none") +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) + 
   geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
@@ -152,9 +211,19 @@ ggplot(df, aes(x = TotSF, y = SalePrice, color = TotSF)) +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
 
+ggplot(df2, aes(x = TotSF, y = SalePrice, color = TotSF)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
+
 # Above Ground Living Area Scatterplot
 
 ggplot(df, aes(x = GrLivArea, y = SalePrice, color = GrLivArea)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
+
+ggplot(df2, aes(x = GrLivArea, y = SalePrice, color = GrLivArea)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
@@ -166,8 +235,20 @@ ggplot(df, aes(x = TotalBsmtSF, y = SalePrice, color = TotalBsmtSF)) +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
 
+ggplot(df2, aes(x = TotalBsmtSF, y = SalePrice, color = TotalBsmtSF)) + 
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
+
 # Total Bathrooms Scatterplot
+
 ggplot(df, aes(x = TotalBath, y = SalePrice, color = TotalBath)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  scale_x_continuous(breaks = seq(0, 6, by = 0.5))
+
+ggplot(df2, aes(x = TotalBath, y = SalePrice, color = TotalBath)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
@@ -182,9 +263,21 @@ ggplot(df, aes(x = TotalBath, y = SalePrice, group = TotalBath, color = TotalBat
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
   scale_x_continuous(breaks = seq(0, 6, by = 0.5))
 
+ggplot(df2, aes(x = TotalBath, y = SalePrice, group = TotalBath, color = TotalBath)) +
+  geom_boxplot(alpha = .75, size = .25) +
+  geom_jitter(shape = 16, position = position_jitter(0.2), size = 1, alpha = .25) +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  scale_x_continuous(breaks = seq(0, 6, by = 0.5))
+
 # Age Scatterplot
 
 ggplot(df, aes(x = -Age, y = SalePrice, color = Age)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
+
+ggplot(df2, aes(x = -Age, y = SalePrice, color = Age)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
@@ -196,9 +289,20 @@ ggplot(df, aes(x = DateSold, y = SalePrice)) +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
 
+ggplot(df2, aes(x = DateSold, y = SalePrice)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
+
 # Year Built Boxplot
 
 ggplot(df, aes(x = as.factor(YearBuilt), y = SalePrice, color = YearBuilt)) + 
+  geom_boxplot() +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  scale_x_discrete(breaks = seq(1870, 2010, 10)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(df2, aes(x = as.factor(YearBuilt), y = SalePrice, color = YearBuilt)) + 
   geom_boxplot() +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
   scale_x_discrete(breaks = seq(1870, 2010, 10)) +
@@ -213,6 +317,14 @@ ggplot(df, aes(x = as.factor(YearBuilt), y = SalePrice, color = YearBuilt)) +
   scale_x_discrete(breaks = seq(1870, 2010, 10)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+ggplot(df2, aes(x = as.factor(YearBuilt), y = SalePrice, color = YearBuilt)) + 
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  scale_x_discrete(breaks = seq(1870, 2010, 10)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "Year Built")
+
 # Year Remodeled Boxplot
 
 ggplot(df, aes(x = as.factor(YearRemodAdd), y = SalePrice, color = YearRemodAdd)) +
@@ -221,9 +333,22 @@ ggplot(df, aes(x = as.factor(YearRemodAdd), y = SalePrice, color = YearRemodAdd)
   scale_x_discrete(breaks = seq(1950, 2010, 5)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+ggplot(df2, aes(x = as.factor(YearRemodAdd), y = SalePrice, color = YearRemodAdd)) +
+  geom_boxplot() +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  scale_x_discrete(breaks = seq(1950, 2010, 5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 # Year Remodeled Scatterplot
 
 ggplot(df, aes(x = as.factor(YearRemodAdd), y = SalePrice, color = YearRemodAdd)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  scale_x_discrete(breaks = seq(1950, 2010, 5)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(df2, aes(x = as.factor(YearRemodAdd), y = SalePrice, color = YearRemodAdd)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
@@ -240,11 +365,21 @@ ggplot(series, aes(x = DateSold)) +
   geom_line(aes(y = median), color = 'deepskyblue4', size = 1) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
 
+series2 <- df2 %>% 
+  group_by(., DateSold) %>% 
+  summarise(., mean = mean(SalePrice), median = median(SalePrice), n = n())
+
+ggplot(series2, aes(x = DateSold)) +
+  geom_line(aes(y = mean, color = 'Mean')) +
+  geom_line(aes(y = median, color = 'Median')) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  labs(y = "Sale Price") + scale_colour_manual("Housing Prices", values = c("lightcoral", "deepskyblue4"))
+
 # MSSubClass
 
-df2 <- df
+df3 <- df
 
-df2$MSSubClass <- recode(df2$MSSubClass, '20'='1 story 1946+', '30'='1 story 1945-',
+df3$MSSubClass <- recode(df3$MSSubClass, '20'='1 story 1946+', '30'='1 story 1945-',
                          '40'='1 story unf attic', '45'='1,5 story unf',
                          '50'='1,5 story fin', '60'='2 story 1946+',
                          '70'='2 story 1945-', '75'='2,5 story all ages', 
@@ -253,18 +388,42 @@ df2$MSSubClass <- recode(df2$MSSubClass, '20'='1 story 1946+', '30'='1 story 194
                          '150'='1,5 story PUD all', '160'='2 story PUD 1946+', 
                          '180'='PUD multilevel', '190'='2 family conversion')
 
-ggplot(df2, aes(x = MSSubClass, y = SalePrice, fill = MSSubClass)) +
+ggplot(df3, aes(x = MSSubClass, y = SalePrice, fill = MSSubClass)) +
   geom_bar(stat = 'summary', fun.y = 'median') +
   theme(legend.position="none", axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
   geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
 
-ggplot(df2, aes(x = MSSubClass, y = SalePrice, fill = MSSubClass)) +
+ggplot(df3, aes(x = MSSubClass, y = SalePrice, fill = MSSubClass)) +
   geom_boxplot(alpha = .75, size = .25) +
   geom_jitter(shape = 16, position = position_jitter(0.2), size = 1, alpha = .25) +
   theme(legend.position="none", axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
   geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
+
+df4 <- df2
+
+df4$MSSubClass <- recode(df4$MSSubClass, '20'='1 story 1946+', '30'='1 story 1945-',
+                         '40'='1 story unf attic', '45'='1,5 story unf',
+                         '50'='1,5 story fin', '60'='2 story 1946+',
+                         '70'='2 story 1945-', '75'='2,5 story all ages', 
+                         '80'='split/multi level', '85'='split foyer', 
+                         '90'='duplex all style/age', '120'='1 story PUD 1946+', 
+                         '150'='1,5 story PUD all', '160'='2 story PUD 1946+', 
+                         '180'='PUD multilevel', '190'='2 family conversion')
+
+ggplot(df4, aes(x = reorder(MSSubClass, -SalePrice), y = SalePrice, fill = MSSubClass)) +
+  geom_bar(stat = 'summary', fun.y = 'median') +
+  theme(legend.position="none", axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
+
+ggplot(df4, aes(x = reorder(MSSubClass, SalePrice), y = SalePrice, fill = MSSubClass)) +
+  geom_boxplot(alpha = .75, size = .25) +
+  theme(legend.position="none", axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3) +
+  labs(x = "MSSubClass")
   
 # Garage
 
@@ -279,3 +438,29 @@ ggplot(df, aes(x = GarageArea, y = SalePrice, color = GarageArea)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
+
+ggplot(df2, aes(x = GarageCars, y = SalePrice, group = GarageCars, fill = GarageCars)) +
+  geom_boxplot(alpha = .75, size = .25) +
+  theme(legend.position="none") +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
+  geom_label(stat = "count", aes(label = ..count.., y = ..count..), size = 3)
+
+ggplot(df2, aes(x = GarageArea, y = SalePrice, color = GarageArea)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
+  scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma)
+
+
+# PCA
+
+df_tot <- df[1:nrow(df),]
+df_tot$SalePrice <- log(df_tot$SalePrice)
+
+df_tot <- as.data.frame(sapply(df_tot, as.numeric))
+testdf_tot <- df[(nrow(df)+1):nrow(df),]
+
+df.ctrl <- trainControl(method="repeatedcv",number=10,
+                        repeats=10,
+                        verboseIter=FALSE)
+
+test.data <- predict(pca,newdata=test.data.transformed)

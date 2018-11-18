@@ -7,7 +7,7 @@ library(zoo)
 library(VIM)
 
 ### load raw data
-df = read_csv("rawData/train.csv")
+df = read_csv("train.csv")
 # test = read_csv("rawData/test.csv")
 
 # check summary statistics
