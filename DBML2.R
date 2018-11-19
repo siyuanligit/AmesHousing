@@ -11,7 +11,7 @@ library(gbm)
 library(caretEnsemble)
 library(VIM)
 library(xgboost)
-registerDoMC(cores = 4)
+registerDoMC(cores = 3)
 ##train set
 load("cleanDF.rdata")
 head(df)
@@ -95,6 +95,7 @@ train_knn = train(x = trn_x,
                   method = "knn",
                   trControl = cont_knn,
                   tuneGrid = tune_knn)
+##Best is 12
 knn_plot2 = plot(train_knn)
 knn_plot2
 pred_knn = predict(train_knn,newdata = tst_x)
@@ -112,10 +113,10 @@ rforest = train(
   preProcess = c("center", "scale"),
   importance = T
 )
-plot(rforest)
-varImp(rforest,scale = F)
+rf_plot1 = plot(rforest)
+varimp_rf1 = varImp(rforest,scale = F)
 ##Reduced mtry
-tune_forest = expand.grid(mtry = seq(56,96,length = 11))
+tune_forest = expand.grid(mtry = seq(66,86,length = 6))
 set.seed(0)
 rforest = train(
   x = trn_x,
@@ -126,7 +127,26 @@ rforest = train(
   preProcess = c("center", "scale"),
   importance = T
 )
+rf_plot2 = plot(rforest)
 
+##further reduced
+tune_forest = expand.grid(mtry = seq(39,66,length = 10))
+set.seed(0)
+rforest = train(
+  x = trn_x,
+  y = trn_y,
+  trControl = cont_forest,
+  tuneGrid = tune_forest,
+  method = "rf",
+  preProcess = c("zv","center", "scale"),
+  importance = T
+)
+##Best Mtry is 66
+rf_plot3 = plot(rforest)
+varimp_rf2 = varImp(rforest,scale = T)
+plot(varimp_rf2)
+pred_rf = predict(rforest,newdata = tst_x)
+rmse(pred_rf,tst_y)
 ##e-net
 cont_enet <- trainControl(method = "cv", number = 10)
 set.seed(0)
@@ -134,7 +154,7 @@ train_enet <- train(
   x = trn_x,
   y = trn_y,
   method = "glmnet",
-  preProc = c("center", "scale"),
+  preProc = c("zv","center", "scale"),
   trControl = cont_enet,
   tuneLength = 10
 )
@@ -151,7 +171,7 @@ tune_GBM = expand.grid(n.trees = seq(100,500,by = 100),
 set.seed(0)
 train_GBM = train(x = trn_x,
                   y = trn_y,
-                  trControl = cont_GBM
+                  trControl = cont_GBM,
                   tuneGrid = tune_GBM,
                   preProc = c("center","scale"),
                   method = "gbm")
@@ -167,7 +187,7 @@ cont_ensemble = trainControl(method = "cv",number = 10,savePredictions = "final"
 tune_ensemble = list(
   caretModelSpec(
     method = "rf",
-    tuneGrid = expand.grid(mtry = ncol(trn_x) / 3),
+    tuneGrid = expand.grid(mtry = 66),
     preProc = c("center", "scale")
   ),
   caretModelSpec(
@@ -177,12 +197,12 @@ tune_ensemble = list(
   ),
   caretModelSpec(
     method = "gbm",
-    tuneGrid = expand.grid(n.trees = 300,interaction.depth = 5,shrinkage = .1,n.minobsinnode = 10),
+    tuneGrid = expand.grid(n.trees = 200,interaction.depth = 5,shrinkage = .1,n.minobsinnode = 10),
     preProc = c("center", "scale")
   ),
   caretModelSpec(
     method = "knn",
-    tuneGrid = expand.grid(k = 34),
+    tuneGrid = expand.grid(k = 12),
     preProc = c("center", "scale")
   )
 )
@@ -201,17 +221,16 @@ dotplot(ensemble_results)
 modelCor(ensemble_results)
 
 stack_control = trainControl(method = "cv", n = 10,savePredictions = "final")
-stack_glm = caretStack(train_ensemble,method = "glm",trControl = stack_control,preProc = c("center","scale"))
-pred_stack = predict(stack_glm,newdata = tst_x)
+stack_glmnet = caretStack(train_ensemble,method = "glmnet",trControl = stack_control,preProc = c("center","scale"),tuneLength = 10)
+pred_stack = predict(stack_glmnet,newdata = tst_x)
 rmse(pred_stack,tst_y)
-summary(stack_glm) 
-
+stack_glmnet$model
 ##Final Prediction
 colnames(test)
 test$SalePrice = 0
 test1 = model.matrix(SalePrice ~ ., data = test)[,-1]
 class(test1)
-pred_final = predict(stack_glm,newdata = test1)
+pred_final = predict(stack_glmnet,newdata = test1)
 length(pred_final)
 Id = seq(1461,2919)
 length(Id)
