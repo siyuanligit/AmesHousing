@@ -73,7 +73,7 @@ paramsGBM = list(learn_rate = c(0.01, 0.1),
 system.time({
     gbmSparse_grid = h2o.grid("gbm",
                         x = predictorsSparse, y = response, training_frame = trainSparse2o, validation_frame = testSparse2o,
-                        seed = 0, grid_id = "gbmSparse_grid", hyper_params = paramsGBM, nfolds = 10)
+                        seed = 0, grid_id = "gbmSparse_grid", hyper_params = paramsGBM)
 })
 
 h2o.getGrid(grid_id = "gbmSparse_grid",
@@ -83,7 +83,7 @@ h2o.getGrid(grid_id = "gbmSparse_grid",
 system.time({
     gbmFinal = h2o.gbm(x = predictorsSparse, y = response, training_frame = trainSparse2o,
                        ntrees = 400, max_depth = 3, learn_rate = 0.1, sample_rate = 0.75, col_sample_rate = 0.75,
-                       seed = 0, nfolds = 10)
+                       seed = 0)
 }) # 4.48 secs
 h2o.performance(gbmFinal, testSparse2o) # RMSE 0.1056
 
@@ -93,7 +93,7 @@ paramsRF = list(ntrees = c(100, 200, 300, 400, 500),
 system.time({
     rfSparse_grid = h2o.grid("randomForest",
                              x = predictorsSparse, y = response, training_frame = trainSparse2o, validation_frame = testSparse2o,
-                             seed = 0, grid_id = "rfSparse_grid", hyper_params = paramsRF, nfolds = 10)
+                             seed = 0, grid_id = "rfSparse_grid", hyper_params = paramsRF)
 })
 
 h2o.getGrid(grid_id = "rfSparse_grid",
@@ -102,7 +102,7 @@ h2o.getGrid(grid_id = "rfSparse_grid",
 
 system.time({
     rfFinal = h2o.randomForest(x = predictorsSparse, y = response, training_frame = trainSparse2o,
-                               ntrees = 400, mtries = 51, seed = 0, nfolds = 10)
+                               ntrees = 400, mtries = 51, seed = 0)
 }) # 29.05 secs
 h2o.performance(rfFinal, testSparse2o) # RMSE 0.1169
 
@@ -119,8 +119,8 @@ system.time({
 h2o.performance(glmFinal, testSparse2o) # RMSE 0.0947
 
 
-autoML = h2o.automl(x = predictorsSparse, y = response, training_frame = trainSparse2o, nfolds = 10)
-h2o.performance(autoML, testSparse2o)
+# autoML = h2o.automl(x = predictorsSparse, y = response, training_frame = trainSparse2o)
+# h2o.performance(autoML, testSparse2o)
 
 # with caret
 trainCX = model.matrix(SalePrice ~ ., data = trainSparse)[,-1]
@@ -137,10 +137,14 @@ system.time({
                            interaction.depth = c(1,3,5),
                            shrinkage = c(0.01, 0.1),
                            n.minobsinnode = 10
-                         ))}) # 981 secs, ntree=400, depth=3, lr=0.1, terminalNode=10
+                         ),
+                         verbose = FALSE)}) # 981 secs, ntree=400, depth=3, lr=0.1, terminalNode=10
 
 testResult = predict(gbmNative, newdata = testCX)
-rmse(testResult, testCY) # 0.1126
+rmse(testResult, testCY) # 0.1025
+
+varImp(gbmNative)
+tune(gbmNative)
 
 system.time({
     xgboost = caret::train(x = trainCX, y = trainCY,
@@ -151,12 +155,12 @@ system.time({
                                  eta = 0.1,
                                  gamma = 0,
                                  colsample_bytree = 0.75,
-                                 min_child_weight = 1,
+                                 min_child_weight = 3,
                                  subsample = 0.75
                              ))}) # 125.57 secs
 
 testResult = predict(xgboost, newdata = testCX)
-rmse(testResult, testCY) # 0.1059
+rmse(testResult, testCY) # 0.1096
 
 # shutdown h2o
 h2o.shutdown()
