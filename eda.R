@@ -13,6 +13,10 @@ library(caret)
 library(xgboost)
 library(gdata)
 library(outliers)
+library(mRMRe)
+library(randomForest)
+library(DT)
+library(Metrics)
 
 ### load raw data
 df = read_csv("train.csv")
@@ -150,7 +154,7 @@ lm.plt <- function(data, mapping, ...){
   return(plt)
 }
 
-ggpairs(allnumVar2, cor_High2[1:6], lower = list(continuous = lm.plt))
+ggpairs(allnumVar2, cor_High2[1:10], lower = list(continuous = lm.plt))
 
 # SalePrice Count
 
@@ -265,7 +269,6 @@ ggplot(df, aes(x = TotalBath, y = SalePrice, group = TotalBath, color = TotalBat
 
 ggplot(df2, aes(x = TotalBath, y = SalePrice, group = TotalBath, color = TotalBath)) +
   geom_boxplot(alpha = .75, size = .25) +
-  geom_jitter(shape = 16, position = position_jitter(0.2), size = 1, alpha = .25) +
   geom_smooth(method = "lm", se = FALSE, color = "red", aes(group = 1)) +
   scale_y_continuous(breaks = seq(0, 800000, by = 50000), labels = scales::comma) +
   scale_x_continuous(breaks = seq(0, 6, by = 0.5))
@@ -453,14 +456,56 @@ ggplot(df2, aes(x = GarageArea, y = SalePrice, color = GarageArea)) +
 
 # PCA
 
-df_tot <- df[1:nrow(df),]
-df_tot$SalePrice <- log(df_tot$SalePrice)
 
-df_tot <- as.data.frame(sapply(df_tot, as.numeric))
-testdf_tot <- df[(nrow(df)+1):nrow(df),]
+num_features <- names(which(sapply(df2, is.numeric)))
+cat_features <- names(which(sapply(df2, is.character)))
 
-df.ctrl <- trainControl(method="repeatedcv",number=10,
-                        repeats=10,
-                        verboseIter=FALSE)
+df2.numeric <- df2[num_features]
 
-test.data <- predict(pca,newdata=test.data.transformed)
+require(factoextra)
+pmatrix <- prcomp(df.numeric, center = TRUE, scale. = TRUE)
+
+pcaVar <- as.data.frame(c(get_pca_var(pmatrix)))
+
+# lets
+pcaVarNew <- pcaVar[, 1:10]
+
+var <- pcaVarNew[FALSE,]
+k <- 1
+for(i in colnames(pcaVarNew)){
+  for(j in rownames(pcaVarNew)){
+    if(abs(pcaVarNew[j, i]) >= 0.5) {
+      var[k, i] <- j
+      k <- k + 1
+    }
+  }
+  k <- 1
+}
+
+datatable(var)
+
+df2 %>% 
+  mutate(OverallQual = as.numeric(OverallQual),
+         OverallCond = as.numeric(OverallCond),
+         interQual = OverallQual * OverallCond)
+
+target <- "SalePrice"
+out <- c("Street", "Alley", "LandContour", "Utilities", "LandSlope", "Condition2", "RoofMatl", "BsmtCond", "BsmtFinType2", "BsmtFinSF2", "Heating", "LowQualFinSF", "OpenPorchSF", "EnclosedPorch", "X3SsnPorch", "ScreenPorch", "PoolArea", "MiscVal", "KitchenAbvGr", "LowQualFinSF", "Functional", "PoolQC", "MiscFeature", "MasVnrArea", "Id")
+
+fold <- rep_len(1:10, nrow(df2))
+set.seed(0)
+fold <- sample(fold, nrow(df2))
+
+err <- c()
+for(i in 1:10){
+  idx <- which(fold == i)
+  tTrain <- df2[-idx, ]
+  tTest <- df2[idx, ]
+  set.seed(0)
+  modelNew <- randomForest(y = tTrain[,target], x = tTrain[, !names(tTrain) %in% c("SalePrice", out)], data = tTrain, mtry = 6, ntree = 500 ) #exclude near zero, SalePrice and Id variable from predictors
+  prediction <- predict(modelNew, tTest)
+  print("Ok")
+  err <- c(err, rmse(tTest[, target], prediction))
+}
+err
+mean(err)
