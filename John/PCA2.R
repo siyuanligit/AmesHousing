@@ -6,6 +6,7 @@ library(caret)
 library(car)
 library(Metrics)
 library(glmnet)
+library(dplyr)
 
 doPCA = T
 doVIF = T
@@ -16,7 +17,10 @@ load(file = "cleanDF.rdata")
 df$Age = ifelse(df$Age < 0, 0, df$Age)
 
 #bc boxcox lambda close to zero, see other code
-df$SalePrice = log(df$SalePrice)
+response = select(df, SalePrice)
+response$SalePrice = log(response$SalePrice)
+
+df = select(df, -SalePrice)
 
 #Various numerical -> categorical
 summary(df)
@@ -28,9 +32,6 @@ df$MoSold = as.character(df$MoSold)
 df$YrSold = as.character(df$YrSold)
 
 df = select(df, -DateSold)
-
-allx = select(df, -SalePrice)
-ally = select(df, SalePrice)
 
 ######################################
 #normalize
@@ -53,7 +54,7 @@ scale_center_num = function(col) {
   return(data)
 }
 
-df_norm = sapply(df_num_log, scale_center_num)
+df_norm = as.data.frame(sapply(df_num_log, scale_center_num))
 
 summary(df_norm)
 
@@ -64,11 +65,11 @@ summary(df_norm)
 set.seed(0)
 trainIds = sample(1:nrow(df_norm), floor(nrow(df_norm)*4/5), replace = F)
 
-trainx = df_norm[trainIds,]
-testx = df_norm[-trainIds,]
+trainx = as.data.frame(df_norm[trainIds,])
+testx = as.data.frame(df_norm[-trainIds,])
 
-trainy = ally[trainIds,]
-testy = ally[-trainIds,]
+trainy = response[trainIds,]
+testy = response[-trainIds,]
 
 ##################################
 #Aliases and VIF on continuous Vars
@@ -78,13 +79,13 @@ if(doVIF) {
 
   thisVIFs = vif(vifmodel)
   
-  df_norm = df_norm[,thisVIFs < 5]
+  df_norm = as.data.frame(df_norm[,thisVIFs < 5])
   
   trainx = df_norm[trainIds,]
   testx = df_norm[-trainIds,]
   
-  trainy = ally[trainIds,]
-  testy = ally[-trainIds,]
+  trainy = response[trainIds,]
+  testy = response[-trainIds,]
   
 }
 ######################################
@@ -96,14 +97,14 @@ if(doPCA) {
   PCAdata = df_norm
   PCAcov = cov(PCAdata)
   
-  fa.parallel(PCAcov, #The data in question.
+  scree = fa.parallel(PCAcov, #The data in question.
               n.obs = nrow(PCAdata), #Since we supplied a
               #covaraince matrix,need to know n.
               fa = "pc", #Display the eigenvalues for PCA.
               n.iter = 100) #Number of simulated analyses to perform.
   abline(h = 1)
   
-  nfacts = 7
+  nfacts = scree$ncomp
   
   PCAs = principal(PCAdata, nfactors = nfacts, rotate = "none")
   
@@ -116,8 +117,8 @@ if(doPCA) {
   trainx = df_norm[trainIds,]
   testx = df_norm[-trainIds,]
   
-  trainy = ally[trainIds,]
-  testy = ally[-trainIds,]
+  trainy = response[trainIds,]
+  testy = response[-trainIds,]
   
 }
 
@@ -146,8 +147,8 @@ if(addDums) {
   trainx = df_norm[trainIds,]
   testx = df_norm[-trainIds,]
   
-  trainy = ally[trainIds,]
-  testy = ally[-trainIds,]
+  trainy = response[trainIds,]
+  testy = response[-trainIds,]
   
 }
 ################################
@@ -167,7 +168,7 @@ print(rmse(testy$SalePrice, preds))
 #LASSO
 #############################
 LASSO_X_model_matr = model.matrix(SalePrice ~ .,
-                                  data = cbind(trainx, trainy))[, -1]
+                                  data = cbind(trainx, trainy))[,-1]
 LASSO_Y_train = trainy$SalePrice
 
 grid = 10^seq(5, -5, length = 1000)
@@ -194,20 +195,22 @@ lasso_pred = predict.cv.glmnet(cv_lasso,newx = test_X_model_matr,s = "lambda.min
 print(rmse(lasso_pred,testy$SalePrice))
 
 
-##################################
+#################################
 #Forest
 #################################
 set.seed(0)
-oob.err = numeric(10)
-for (mtry in 1:10) {
+oob.err = numeric(min(10, ncol(trainx)))
+names(trainx) = gsub('3', 'E', names(trainx))
+for (mtry in 1:min(10, ncol(trainx))) {
   fit = randomForest(SalePrice ~ ., data = cbind(trainx, trainy),
                      mtry = mtry, importance = TRUE)
   oob.err[mtry] = fit$mse[500]
   cat("We're performing iteration", mtry, "\n")
 }
 
+
 #Visualizing the OOB error.
-plot(1:10, oob.err, pch = 16, type = "b",
+plot(1:min(10, ncol(trainx)), oob.err, pch = 16, type = "b",
      xlab = "Variables Considered at Each Split",
      ylab = "OOB Mean Squared Error",
      main = "Random Forest OOB Error Rates\nby # of Variables")
@@ -216,7 +219,8 @@ plot(1:10, oob.err, pch = 16, type = "b",
 #stuck with 10 trees because took too long to go higher.
 #pretty clear that LASSO will win
 rf2 = randomForest(SalePrice ~ ., data = cbind(trainx, trainy),
-                   mtry = 10, ntree = 500, importance = TRUE)
+                   mtry = which(oob.err == min(oob.err), arr.ind = TRUE),
+                   ntree = 500, importance = TRUE)
 
 
 
@@ -224,6 +228,7 @@ rf2 = randomForest(SalePrice ~ ., data = cbind(trainx, trainy),
 importance(rf2)
 varImpPlot(rf2)
 
+names(testx) = gsub('3', 'E', names(testx))
 rf_preds = predict(rf2, newdata = testx)
 
 
