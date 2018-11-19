@@ -9,8 +9,11 @@ library(Matrix)
 library(glmnet)
 library(gbm)
 library(caretEnsemble)
+library(VIM)
+library(xgboost)
+registerDoMC(cores = 4)
+##train set
 load("cleanDF.rdata")
-registerDoMC(cores = 3)
 head(df)
 ##Remove DateSold
 df = df %>%
@@ -29,16 +32,38 @@ for(i in 1:length(colnames.2.log)) {
                                    log(df[, colnames.2.log[i]] + 1),
                                    log(df[, colnames.2.log[i]]))
 }
+df$MSSubClass = as.character(df$MSSubClass)
+df$OverallCond = as.character(df$OverallCond)
+df$OverallQual = as.character(df$OverallQual)
 
+##Test Set
+load("testDF.rdata")
+##Remove DateSold
+test = test %>%
+  select(.,-DateSold)
 
-##Dummycode categorical predictors
-dfdum = dummyVars(~ ., data = df,sep = ".")
-DF = predict(dfdum,df)
-DF = as.data.frame(DF)
-colnames(DF)
-DF = DF %>%
+##Log same predictors predictors
+for(i in 1:length(colnames.2.log)) {
+  test[, colnames.2.log[i]] = ifelse(min(test[, colnames.2.log[i]]) == 0,
+                                      log(test[, colnames.2.log[i]] + 1),
+                                      log(test[, colnames.2.log[i]]))
+}
+
+test$SalePrice = NA
+
+bigdf = rbind(df,test)
+bigdum = dummyVars(~ ., data = bigdf,sep = ".")
+bigdf = predict(bigdum,bigdf)
+bigdf = as.data.frame(bigdf)
+bigdf = bigdf %>%
   select(.,-ends_with("No"))
-col2 = colnames(DF)
+
+DF = bigdf %>%
+  filter(.,!is.na(SalePrice))
+
+test = bigdf %>%
+  filter(.,is.na(SalePrice))
+
 ## Split train,test
 set.seed(0)
 parts = createDataPartition(DF$SalePrice,p = .8,list = F)
@@ -52,20 +77,57 @@ trn_y = log(trn$SalePrice)
 tst_x = model.matrix(SalePrice ~ ., data = tst)[,-1]
 tst_y = log(tst$SalePrice)
 
-##Random Forest
-cont_forest  = trainControl(method = "oob")
-tune_forest = expand.grid(mtry = c(sqrt(ncol(trn_x)),ncol(trn_x)/3))
+#kNN
+cont_knn = trainControl(method = "cv", n = 10)
 set.seed(0)
-system.time({rforest = train(x = trn_x,
-                             y = trn_y,
-                             trControl = cont_forest,
-                             tuneGrid = tune_forest,
-                             method = "rf",
-                             preProcess = c("center","scale"),
-                             importance = T)})
-preds_forest = predict(rforest,newdata = tst_x)
-rmse(preds_forest,tst_y)
+train_knn = train(x = trn_x,
+                  y = trn_y,
+                  method = "knn",
+                  trControl = cont_knn,
+                  tuneLength = 50)
+knn_plot1 = plot(train_knn)
+knn_plot1
+##shortened grid
+tune_knn = expand.grid(k = 10:12)
+set.seed(0)
+train_knn = train(x = trn_x,
+                  y = trn_y,
+                  method = "knn",
+                  trControl = cont_knn,
+                  tuneGrid = tune_knn)
+knn_plot2 = plot(train_knn)
+knn_plot2
+pred_knn = predict(train_knn,newdata = tst_x)
+rmse(pred_knn,tst_y)
 
+##Random Forest
+cont_forest  = trainControl(method = "cv",number = 10)
+set.seed(0)
+rforest = train(
+  x = trn_x,
+  y = trn_y,
+  trControl = cont_forest,
+  tuneLength = 10,
+  method = "rf",
+  preProcess = c("center", "scale"),
+  importance = T
+)
+plot(rforest)
+varImp(rforest,scale = F)
+##Reduced mtry
+tune_forest = expand.grid(mtry = seq(56,96,length = 11))
+set.seed(0)
+rforest = train(
+  x = trn_x,
+  y = trn_y,
+  trControl = cont_forest,
+  tuneGrid = tune_forest,
+  method = "rf",
+  preProcess = c("center", "scale"),
+  importance = T
+)
+
+##e-net
 cont_enet <- trainControl(method = "cv", number = 10)
 set.seed(0)
 train_enet <- train(
@@ -81,31 +143,21 @@ pred_enet = predict(train_enet,newdata = tst_x)
 rmse(pred_enet,tst_y)
 
 ##GBM
-cont_GBM = trainControl(method = "oob")
-tune_GBM = expand.grid(n.trees = 500,
-                       interaction.depth = seq(1,9, by = 2),
-                       shrinkage = .1,
+cont_GBM = trainControl(method = "cv",number = 10)
+tune_GBM = expand.grid(n.trees = seq(100,500,by = 100),
+                       interaction.depth = c(1,3,5),
+                       shrinkage = c(.01,.5,.1),
                        n.minobsinnode = 10)
 set.seed(0)
 train_GBM = train(x = trn_x,
                   y = trn_y,
+                  trControl = cont_GBM
                   tuneGrid = tune_GBM,
                   preProc = c("center","scale"),
                   method = "gbm")
 
 pred_GBM = predict(train_GBM,newdata = tst_x)
 rmse(pred_GBM,tst_y)
-
-cont_knn = trainControl(method = "cv", n = 10)
-tune_knn = expand.grid(k = sqrt(nrow(trn_x)))
-train_knn = train(x = trn_x,
-                  y = trn_y,
-                  method = "knn",
-                  trControl = cont_knn,
-                  tuneGrid = tune_knn)
-
-pred_knn = predict(train_knn,newdata = tst_x)
-rmse(pred_knn,tst_y)
 
 ##ENSEMBLE!!!!
 
@@ -136,13 +188,13 @@ tune_ensemble = list(
 )
 
 ##Attempt to run the model
+set.seed(0)
 train_ensemble = caretList(
   x = trn_x,
   y = trn_y,
   trControl = cont_ensemble,
   tuneList = tune_ensemble
 )
-
 ensemble_results = resamples(train_ensemble)
 summary(ensemble_results)
 dotplot(ensemble_results)
@@ -152,31 +204,22 @@ stack_control = trainControl(method = "cv", n = 10,savePredictions = "final")
 stack_glm = caretStack(train_ensemble,method = "glm",trControl = stack_control,preProc = c("center","scale"))
 pred_stack = predict(stack_glm,newdata = tst_x)
 rmse(pred_stack,tst_y)
-summary(train_enet$finalModel)
+summary(stack_glm) 
 
-load("testDF.rdata")
-##Remove DateSold
-test = test %>%
-  select(.,-DateSold)
+##Final Prediction
+colnames(test)
+test$SalePrice = 0
+test1 = model.matrix(SalePrice ~ ., data = test)[,-1]
+class(test1)
+pred_final = predict(stack_glm,newdata = test1)
+length(pred_final)
+Id = seq(1461,2919)
+length(Id)
+final = data.frame(Id = Id,SalePrice = pred_final)
+final$SalePrice = exp(final$SalePrice)
+write_csv(final,"finaL_results.csv")
 
-##Log heavily skewed predictors
-dscrpt2 = describe(test[,sapply(test,is.integer)|sapply(test,is.numeric)])
-colnames.2.log2 = rownames(dscrpt2[abs(dscrpt$skew) > 2,])
-colnames.2.log2
-for(i in 1:length(colnames.2.log2)) {
-  test[, colnames.2.log2[i]] = ifelse(min(test[, colnames.2.log2[i]]) == 0,
-                                   log(test[, colnames.2.log2[i]] + 1),
-                                   log(test[, colnames.2.log2[i]]))
-}
-
-zerovar = nearZeroVar(test,saveMetrics = T)
-rownames(zerovar[zerovar$zeroVar == TRUE,])
-##Dummycode categorical predictors
-test = test %>%
-  select(.,-Utilities)
-dfdum2 = dummyVars(~ ., data = test,sep = ".")
-DF2 = predict(dfdum2,test)
-DF2 = as.data.frame(DF2)
-DF2 = DF2 %>%
-  select(.,-ends_with("No"))
-pred_stack = predict(stack_glm,newdata = DF2)
+##Run the models on the full train dataset
+ftrn_x = model.matrix(SalePrice ~ .,data = DF)[,-1]
+ftrn_y = DF$SalePrice
+ftrn_y = log(DF$SalePrice)
